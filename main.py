@@ -1,5 +1,12 @@
 from sys import argv
 import xml.etree.ElementTree as ET
+from dotenv import load_dotenv
+from os import getenv
+import requests
+import json
+import base64
+
+load_dotenv()
 
 def error(err):
   print(f"error: {err}")
@@ -60,9 +67,12 @@ class Pitch(Note):
     pitch = ['A', 'Bb', 'B', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab'][self.degree]
     return f'"{"-" if self.lyric_pos in [0, 1] else ""}{self.lyric if self.lyric else "_"}"{"-" if self.lyric_pos in [1, 2] else ""} @ {pitch}{self.octave} for {self.duration}ms'
 
+events = {};
+
 # note represented as { degree: int, octave: int }; degree is from 0 (A) to 11 (Bb)
 for part in filter(lambda p: p.get('id') in part_ids, xml.iter('part')):
-  events = [];
+  part_id = part.get('id')
+  events[part_id] = [];
   divisions = None
   tempo = 120 # in bpm
   for measure in part.iter('measure'):
@@ -83,7 +93,7 @@ for part in filter(lambda p: p.get('id') in part_ids, xml.iter('part')):
     for note in measure.iter('note'):
       duration = int(note.find('duration').text) / divisions * 60000 / tempo
       if note.find('rest') is not None:
-        events.append(Rest(duration=duration))
+        events[part_id].append(Rest(duration=duration))
       elif (pitch := note.find('pitch')) is not None:
         alter = int(a.text) if (a := pitch.find('alter')) else 0
         degree = ({'A': 0, 'B': 2, 'C': 3, 'D': 5, 'E': 7, 'F': 8, 'G': 10 }[pitch.find('step').text] + alter) % 12
@@ -92,5 +102,62 @@ for part in filter(lambda p: p.get('id') in part_ids, xml.iter('part')):
         if lyrics is not None:
           lyric = lyrics.find('text').text
           lyric_pos = ['begin', 'middle', 'end', 'single'].index(lyrics.find('syllabic').text)
-        events.append(Pitch(degree=degree, octave=octave, lyric=lyric, lyric_pos=lyric_pos, duration=duration))
-print('\n'.join(map(str, events)))
+        else:
+          lyric, lyric_pos = None, None
+        events[part_id].append(Pitch(degree=degree, octave=octave, lyric=lyric, lyric_pos=lyric_pos, duration=duration))
+
+def join_lyrics(evs):
+  text = ''
+  for event in evs:
+    print(event)
+    if isinstance(event, Pitch):
+      if event.lyric is not None:
+        match event.lyric_pos:
+          case 0:
+            text += ' ' + event.lyric
+          case 1:
+            text += event.lyric
+          case 2:
+            text += event.lyric + ' '
+          case 3:
+            text += ' ' + event.lyric + ' '
+  return text
+
+full_texts = { part: join_lyrics(evs) for part, evs in events.items() }
+print(full_texts)
+
+XI_API_KEY = getenv('XI_API_KEY')
+VOICE_ID = 'ErXwobaYiN019PkySvjV' # Antoni; see https://api.elevenlabs.io/v1/voices
+
+url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}/with-timestamps"
+
+headers = {
+  "Content-Type": "application/json",
+  "xi-api-key": XI_API_KEY
+}
+
+data = {
+  "text": full_texts['P1'],
+  "model_id": "eleven_multilingual_v2",
+  "voice_settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.75
+  }
+}
+
+response = requests.post(
+    url,
+    json=data,
+    headers=headers,
+)
+
+if response.status_code != 200:
+  error(f"Error encountered, status: {response.status_code}, "
+          f"content: {response.text}")
+
+json_string = response.content.decode("utf-8")
+response_dict = json.loads(json_string)
+audio_bytes = base64.b64decode(response_dict["audio_base64"])
+#print(json_string)
+with open('output.mp3', 'wb') as f:
+  f.write(audio_bytes)
