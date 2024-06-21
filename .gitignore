@@ -1,1 +1,4 @@
 .env
+*.mp3
+*.xml
+*.mxl
