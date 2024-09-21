@@ -5,6 +5,7 @@
 *.musicxml
 *.wav
 !baa.musicxml
+!baa.wav
 audio-cache*/
 stretched/
 
