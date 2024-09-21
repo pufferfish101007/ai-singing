@@ -23,7 +23,7 @@ class Rest(Note):
 
 class Pitch(Note):
     """A pitched note, with a lyric"""
-    
+
     def __init__(
         self,
         *,
@@ -115,8 +115,10 @@ def events_from_mxml(
         for measure in part.iter("measure"):
             attrs = measure.find("attributes")
             division = attrs.find("divisions") if attrs is not None else None
-            clef = attrs.find('clef') if attrs is not None else None
-            octave_change_el = clef.find('clef-octave-change') if clef is not None else None
+            clef = attrs.find("clef") if attrs is not None else None
+            octave_change_el = (
+                clef.find("clef-octave-change") if clef is not None else None
+            )
             # if octave_change_el is not None:
             #     octave_change_text = octave_change_el.text
             #     if octave_change_text == '':
@@ -157,21 +159,27 @@ def events_from_mxml(
                         ]
                         + alter
                     ) % 12
-                    octave = int(
-                        not_none(pitch.find("octave")).text or error("no octave text")
-                    ) + octave_change
+                    octave = (
+                        int(
+                            not_none(pitch.find("octave")).text
+                            or error("no octave text")
+                        )
+                        + octave_change
+                    )
                     lyrics = note.find("lyric")
                     if lyrics is not None:
                         lyric: str = not_none((not_none(lyrics.find("text"))).text)
-                        lyric_pos: int = not_none([
-                            "begin",
-                            "middle",
-                            "end",
-                            "single",
-                        ].index(
-                            not_none((lyrics.find("syllabic"))).text
-                            or error("no syllabic text")
-                        ))
+                        lyric_pos: int = not_none(
+                            [
+                                "begin",
+                                "middle",
+                                "end",
+                                "single",
+                            ].index(
+                                not_none((lyrics.find("syllabic"))).text
+                                or error("no syllabic text")
+                            )
+                        )
                         events[part_id].append(
                             Pitch(
                                 degree=[degree],
@@ -184,7 +192,9 @@ def events_from_mxml(
                     else:
                         prev_event = events[part_id][-1]
                         if not isinstance(prev_event, Pitch):
-                            error(f"previous event wasn't a pitch (in measure {measure.get('number')})")
+                            error(
+                                f"previous event wasn't a pitch (in measure {measure.get('number')})"
+                            )
                         prev_event.duration.append(duration)
                         prev_event.degree.append(degree)
                         prev_event.octave.append(octave)

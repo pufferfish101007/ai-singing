@@ -17,7 +17,7 @@ file_name = argv[1]
 part_names = argv[2:]
 
 try:
-    with open(f'{file_name}.musicxml') as file:
+    with open(f"{file_name}.musicxml") as file:
         xml_txt = file.read()
 except:
     error(f"couldn't read file {file_name}.musicxml")
@@ -66,7 +66,7 @@ for evs in events.values():
     for i in range(len(evs) - 1, -1, -1):
         ev = evs[i]
         if isinstance(ev, Pitch) and (ev.lyric is None or ev.lyric == ""):
-            error('empty lyric')
+            error("empty lyric")
 
 full_texts = {part: join_lyrics(evs) for part, evs in events.items()}
 
@@ -93,48 +93,77 @@ try:
                     error(f'"{word}" not registered')
 
                 word_info = words_map[word]
-                
+
                 word_audio = audio.load_audio(f"{cache_path(word)}.mp3")
-               
-                word_audio = audio.strip_silence(audio.crop_audio(word_audio,
-                    s_to_ms(
-                        word_info["character_start_times"][event.lyric_start_pos]
-                    ), s_to_ms(word_info["character_end_times"][event.lyric_end_pos])
-                ))
-                
+
+                word_audio = audio.strip_silence(
+                    audio.crop_audio(
+                        word_audio,
+                        s_to_ms(
+                            word_info["character_start_times"][event.lyric_start_pos]
+                        ),
+                        s_to_ms(word_info["character_end_times"][event.lyric_end_pos]),
+                    )
+                )
+
                 word_audio.export("tmp.wav", format="wav")
 
                 y, sr = librosa.load("tmp.wav", sr=None)
                 y = librosa.resample(y, orig_sr=sr, target_sr=target_sr)
 
-                stretched_y, sr = audio.stretch_audio(y, float(target_sr), sum(event.duration) * 0.001)
-                stretched_y = librosa.resample(stretched_y, orig_sr=sr, target_sr=target_sr)
+                stretched_y, sr = audio.stretch_audio(
+                    y, float(target_sr), sum(event.duration) * 0.001
+                )
+                stretched_y = librosa.resample(
+                    stretched_y, orig_sr=sr, target_sr=target_sr
+                )
 
                 tuned_y = np.array([])
                 for i in range(len(event.duration)):
-                    this_y = stretched_y[int(sum(event.duration[:i]) * 0.001 * target_sr) : int(sum(event.duration[:i+1]) * 0.001 * target_sr)]
-                    #print(len(stretched_y), len(this_y), event.duration)
+                    this_y = stretched_y[
+                        int(sum(event.duration[:i]) * 0.001 * target_sr) : int(
+                            sum(event.duration[: i + 1]) * 0.001 * target_sr
+                        )
+                    ]
+                    # print(len(stretched_y), len(this_y), event.duration)
                     current_pitch = audio.detect_average_pitch(this_y, target_sr)
-                    target_note = ['A', 'Bb', 'B', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab'][event.degree[i]]
-                    target_pitch = librosa.note_to_hz(f'{target_note}{event.octave[i]}')
-                    this_tuned_y, sr = audio.adjust_pitch(this_y, float(target_sr), cast(float, target_pitch))
-                    this_tuned_y = librosa.resample(this_tuned_y, orig_sr=sr, target_sr=target_sr)
+                    target_note = [
+                        "A",
+                        "Bb",
+                        "B",
+                        "C",
+                        "C#",
+                        "D",
+                        "Eb",
+                        "E",
+                        "F",
+                        "F#",
+                        "G",
+                        "Ab",
+                    ][event.degree[i]]
+                    target_pitch = librosa.note_to_hz(f"{target_note}{event.octave[i]}")
+                    this_tuned_y, sr = audio.adjust_pitch(
+                        this_y, float(target_sr), cast(float, target_pitch)
+                    )
+                    this_tuned_y = librosa.resample(
+                        this_tuned_y, orig_sr=sr, target_sr=target_sr
+                    )
                     tuned_y = np.append(tuned_y, this_tuned_y)
-                
-                #print('autotuned')
 
-                #audio.save_audio(tuned_y, sr, 'tmp.wav')
+                # print('autotuned')
+
+                # audio.save_audio(tuned_y, sr, 'tmp.wav')
 
                 part_y = np.append(part_y, tuned_y)
             else:
-                print('rest')
+                print("rest")
                 silence = audio.AudioSegment.silent(duration=int(sum(event.duration)))
-                silence.export('tmp.wav', format='wav')
-                silence_y, sr = librosa.load('tmp.wav', sr=None)
+                silence.export("tmp.wav", format="wav")
+                silence_y, sr = librosa.load("tmp.wav", sr=None)
                 silence_y = librosa.resample(silence_y, orig_sr=sr, target_sr=target_sr)
                 part_y = np.append(part_y, silence_y)
-        audio.save_audio(part_y, target_sr, 'tmp.wav')
-        part_audio = audio.AudioSegment.from_file('tmp.wav', format='wav')
+        audio.save_audio(part_y, target_sr, "tmp.wav")
+        part_audio = audio.AudioSegment.from_file("tmp.wav", format="wav")
         if part_audio.duration_seconds > whole_audio.duration_seconds:
             whole_audio = part_audio.overlay(whole_audio)
         else:
