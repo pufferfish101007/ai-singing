@@ -1,4 +1,4 @@
 python-dotenv
 pydub
 pydub-stubs
-audiostretchy[all] @ git+https://github.com/pufferfish101007/audiostretchy@ad2c4dd1c1886a2476f8b9642f6b56ac0a0a25fc
+pyrubberband==0.3.0
